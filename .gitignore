@@ -1,0 +1,7 @@
+vendor/
+*.log
+.DS_Store
+
+# Java build output
+**/target/
+registry-dataprovider-plugin/dist/

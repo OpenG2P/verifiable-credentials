@@ -1,0 +1,32 @@
+{{- if and .Values.certify.enabled .Values.certify.istio.enabled .Values.istio.virtualservice.enabled }}
+{{- $host := include "common.tplvalues.render" (dict "value" .Values.istio.virtualservice.host "context" .) }}
+{{- $gateway := .Values.istio.virtualservice.gateway }}
+{{- $backendCtx := dict "Values" (merge (deepCopy .Values.certify) (dict "global" .Values.global)) "Chart" .Chart "Release" .Release "Files" .Files "Capabilities" .Capabilities -}}
+{{- $backendName := include "common.names.fullname" $backendCtx -}}
+{{- $backendPort := .Values.certify.service.port -}}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ .Release.Name }}-certify
+  labels: {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" .) | nindent 4 }}
+spec:
+  hosts:
+    - {{ $host | quote }}
+  gateways:
+    - {{ $gateway }}
+  http:
+    - name: certify
+      match:
+        - uri:
+            prefix: /v1/certify
+      headers:
+        request:
+          set:
+            x-forwarded-host: {{ $host | quote }}
+            x-forwarded-proto: https
+      route:
+        - destination:
+            host: {{ $backendName }}
+            port:
+              number: {{ $backendPort }}
+{{- end }}

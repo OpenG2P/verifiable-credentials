@@ -1,0 +1,39 @@
+# ---------------------------------------------------------------------------
+# Sample Inji Certify properties for the OpenG2P Registry DataProvider plugin.
+# Merge these into your active Certify profile (e.g. certify-registry.properties),
+# adjusting hosts/credentials/queries. Secrets should come from env / K8s Secrets.
+# ---------------------------------------------------------------------------
+
+## Plugin selection & discovery -------------------------------------------------
+# Component-scan this plugin's package so Certify finds the beans:
+mosip.certify.integration.scan-base-package=org.openg2p.certify.registry
+# Activate this plugin (matches the @ConditionalOnProperty havingValue):
+mosip.certify.integration.data-provider-plugin=RegistryDataProviderPlugin
+mosip.certify.plugin-mode=DataProvider
+
+## External Registry datasource (read-only) ------------------------------------
+mosip.certify.data-provider-plugin.registrydb.url=jdbc:postgresql://registry-db:5432/registrydb
+mosip.certify.data-provider-plugin.registrydb.username=certify_ro
+mosip.certify.data-provider-plugin.registrydb.password=${REGISTRY_DB_PASSWORD}
+mosip.certify.data-provider-plugin.registrydb.driver-class-name=org.postgresql.Driver
+
+## Scope -> SQL query (named params). The view/table lives entirely in the SQL. -
+# Alias columns to match the credential template's ${...} variables (quote to keep case).
+mosip.certify.data-provider-plugin.scope-query-mapping={\
+  'registry_vc_ldp': 'select "fullName", "dateOfBirth", "gender", "functionalId" \
+                       from beneficiary_vc_view where phone = :id'\
+}
+
+## SQL param -> token claim. Removes the hardcoded :id = sub.
+# Bind :id from whatever identity claim the issuance carries (e.g. phone_number):
+mosip.certify.data-provider-plugin.param-claim-mapping={ 'id': 'phone_number' }
+
+## Issuer identity used by Certify core (per credential_config too) -------------
+mosip.certify.data-provider-plugin.did-url=did:web:<issuer-host>
+mosip.certify.data-provider-plugin.id-field-prefix-uri=https://<issuer-host>/credential/
+mosip.certify.data-provider-plugin.rendering-template-id=
+
+## Token validation — trust your OIDC authorization server. Set to your AS values: -
+# mosip.certify.authn.issuer-uri=https://<oidc-host>/oidc
+# mosip.certify.authn.jwk-set-uri=https://<oidc-host>/oidc/jwks
+# mosip.certify.authn.allowed-audiences={ '<certify-credential-audience>' }

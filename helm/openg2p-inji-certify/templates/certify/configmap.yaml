@@ -1,0 +1,42 @@
+{{- if .Values.certify.enabled }}
+{{- $values := .Values.certify -}}
+{{- $context := dict "Values" (merge (deepCopy $values) (dict "global" .Values.global)) "Chart" .Chart "Release" .Release "Files" .Files "Capabilities" .Capabilities -}}
+{{- with $context -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "common.names.fullname" . }}-config
+  labels: {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+data:
+  # Spring property overrides layered on top of the image's bundled defaults.
+  # SPRING_CONFIG_NAME=certify + active_profile_env=default => Certify loads
+  # `certify-default.properties` from SPRING_CONFIG_LOCATION (/home/mosip/config).
+  # Mirrors the verified docker-compose Phase-1 config (push / pre-authorized-code).
+  certify-default.properties: |
+    # --- Certify as its own OAuth Authorization Server (pre-authorized-code, no eSignet) ---
+    mosip.certify.domain.url={{ tpl .Values.appConfig.domainUrl $ }}
+    mosip.certify.identifier={{ tpl .Values.appConfig.domainUrl $ }}
+    mosip.certify.authorization.url={{ tpl .Values.appConfig.domainUrl $ }}
+    mosip.certify.authn.issuer-uri={{ tpl .Values.appConfig.domainUrl $ }}
+    mosip.certify.authn.jwk-set-uri={{ tpl .Values.appConfig.domainUrl $ }}/v1/certify/.well-known/jwks.json
+    mosip.certify.authn.allowed-audiences={ '{{ tpl .Values.appConfig.domainUrl $ }}/v1/certify/issuance/credential' }
+    mosip.certify.oauth.issuer={{ tpl .Values.appConfig.domainUrl $ }}
+
+    # --- Phase-1 PUSH: pushed claims become the credential subject (built-in plugin) ---
+    mosip.certify.integration.data-provider-plugin={{ .Values.appConfig.dataProviderPlugin }}
+    mosip.certify.plugin-mode=DataProvider
+
+    # credentialOfferCache is required by the pre-authorized-code / offer flow
+    mosip.certify.cache.names={{ .Values.appConfig.cacheNames }}
+
+    # --- Certify's own datasource (keymanager tables, credential_config) ---
+    {{- $dbUrl := printf "jdbc:postgresql://%s:%v/%s" (tpl .Values.global.postgresqlHost $) .Values.global.certifyDBPort (tpl .Values.global.certifyDB $) }}
+    spring.datasource.url={{ $dbUrl }}
+    spring.datasource.username={{ tpl .Values.global.certifyDBUser $ }}
+    # spring.datasource.password is injected via the SPRING_DATASOURCE_PASSWORD env (from Secret)
+
+    {{- with .Values.appConfig.extraProperties }}
+    {{ . | nindent 4 | trim }}
+    {{- end }}
+{{- end -}}
+{{- end }}

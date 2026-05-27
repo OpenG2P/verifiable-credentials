@@ -1,0 +1,41 @@
+{
+  "credential": {
+    "issuanceDate": "2026-05-25T00:53:02.785Z",
+    "credentialSubject": {
+      "gender": "Female",
+      "primaryCropType": "Coconut",
+      "mobileNumber": "9000000001",
+      "postalCode": "682001",
+      "landArea": "2 hectares",
+      "fullName": "DB-SOURCED Citizen",
+      "secondaryCropType": "Pepper",
+      "dateOfBirth": "1985-07-15",
+      "face": "${face}",
+      "farmerID": "FARMER-DB-777",
+      "villageOrTown": "Fort Kochi",
+      "district": "Kochi",
+      "id": "did:jwk:eyJrdHkiOiJSU0EiLCJlIjoiQVFBQiIsInVzZSI6InNpZyIsImFsZyI6IlJTMjU2IiwibiI6Im4wYW92Q3hsRk9WanZ4VWtwUk1TQmIyZzV1ZkczcVBJZFNBclBDbDNIWTZkWnFUdG03V3VZRm9pZk9fOG5vLTdVZjEwakFjdWU0b0xlUlUxVmhUMk9BaG5xdGZGd2RWTkVwTU1MeXkyOHB6bl9LRE5VVEV4QWRYbm5Sb3kyekF4RERtRzFqXzFmd0d1YldUWUZ0QnEwQUpNbXpQVFl5WHRKUVhlWjJ1Vnk4UWNpb1F6cnk5aHdnOXN4SlhhZlppMTVPZ0RGS3pJcGl6RGdFZ19aOHkxTkFZY1JVRzlRTXBnSGFuVUhnbGltRkpUQnlTazc1MzVBZ0N3cE1KSThoUDBMTUkyOTRhTGtVcXo2TW5tSk1RTWZJdzAwR0tTYVpTM25oWFB1MkRBUUtqY004WVhQOTlRWTVpV04zbzJhMFoyMmJFb2swMEpuX010Mm03UkdZVUVPdyJ9",
+      "state": "Kerala",
+      "landOwnershipType": "Owner"
+    },
+    "id": "https://mosip.io/credential/989f1242-5e8d-4524-88c6-cd943ee18f20",
+    "type": [
+      "VerifiableCredential",
+      "FarmerCredential"
+    ],
+    "@context": [
+      "https://www.w3.org/2018/credentials/v1",
+      "https://piyush7034.github.io/my-files/farmer.json",
+      "https://w3id.org/security/suites/ed25519-2020/v1"
+    ],
+    "issuer": "did:web:8398-2405-201-1029-3025-e142-9ad3-e1f2-f543.ngrok-free.app",
+    "expirationDate": "2028-05-24T00:53:02.785Z",
+    "proof": {
+      "type": "Ed25519Signature2020",
+      "created": "2026-05-25T00:53:02Z",
+      "proofPurpose": "assertionMethod",
+      "verificationMethod": "did:web:8398-2405-201-1029-3025-e142-9ad3-e1f2-f543.ngrok-free.app#ep52yo-XMjywLNVdvETEUKgOFiChYmOGG_TmiQLQzqg",
+      "proofValue": "z5tSaWq4pzEC4MBR23nvdhBfNKKhuUAMwNsEHJiSptSoLVw1DAahjWjAGo5wLzbHqeoSE9eKhH3dexJab3Mr6z1o"
+    }
+  }
+}

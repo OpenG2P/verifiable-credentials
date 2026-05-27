@@ -1,0 +1,188 @@
+global:
+  certifyHostname: 'certify.trial.openg2p.org'
+  # Public base URL of this Certify (used as token issuer / JWKS / audiences).
+  # Must match the host clients use, so the proof `aud` resolves correctly.
+  certifyDomainUrl: 'https://{{ tpl .Values.global.certifyHostname $ }}'
+
+  # Database (provisioned by the postgres-init subchart; server installed separately).
+  postgresqlHost: commons-postgresql
+  certifyDB: '{{ printf "%s" .Release.Name | replace "-" "_" }}'
+  certifyDBPort: 5432
+  certifyDBUser: '{{ printf "%s_user" .Release.Name | replace "-" "_" }}'
+  certifyDBSecret: '{{ .Release.Name }}'
+  certifyDBUserPasswordKey: '{{ .Release.Name }}-db-user'
+
+# ---------------------------------------------------------------------------
+# postgres-init — creates the Certify DB + least-privilege user on the
+# already-installed PostgreSQL. (Schema/tables are seeded by dbSchemaInit below.)
+# ---------------------------------------------------------------------------
+postgres-init:
+  enabled: true
+  postgresql:
+    host: '{{ .Values.global.postgresqlHost }}'
+    port: 5432
+    existingSecret: commons-postgresql
+    existingSecretPostgresPasswordKey: postgres-password
+  databases:
+    - name: '{{ tpl .Values.global.certifyDB $ }}'
+      user: '{{ tpl .Values.global.certifyDBUser $ }}'
+      secret: '{{ tpl .Values.global.certifyDBSecret $ }}'
+      secretUserPasswordKey: '{{ tpl .Values.global.certifyDBUserPasswordKey $ }}'
+
+# ---------------------------------------------------------------------------
+# dbSchemaInit — Helm hook Job that applies Certify's DB scripts (keymanager
+# tables, key_policy_def, credential_config) + the OpenG2P credential_config
+# to the freshly-created DB. SQL lives in files/db-init/*.sql.
+#   NOTE: review files/db-init/*.sql against your Certify image version.
+# ---------------------------------------------------------------------------
+dbSchemaInit:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 300
+
+# ---------------------------------------------------------------------------
+# Certify service
+# ---------------------------------------------------------------------------
+certify:
+  enabled: true
+  # Resource name = <release>-inji-certify (e.g. commons-services-inji-certify),
+  # which is also the in-cluster service host other components target.
+  nameOverride: inji-certify
+  hostname: '{{ tpl .Values.global.certifyHostname $ }}'
+
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  updateStrategy:
+    type: RollingUpdate
+  serviceAccount:
+    create: false
+    name: ""
+  image:
+    repository: injistack/inji-certify-with-plugins
+    tag: "0.14.0"
+    pullPolicy: IfNotPresent
+  podSecurityContext:
+    enabled: false
+  containerSecurityContext:
+    enabled: false
+
+  service:
+    type: ClusterIP
+    port: 80
+    externalTrafficPolicy: Cluster
+
+  istio:
+    enabled: true
+    gateway:
+      enabled: false
+
+  # ---- PKCS12 keystore (the issuer identity; no HSM) -----------------------
+  # Mount an existing Secret holding the .p12. Persist + back it up — the .p12
+  # plus the encrypted key rows ARE the issuer identity. Disable if your image
+  # generates/loads keys another way.
+  p12:
+    enabled: true
+    existingSecret: '{{ .Release.Name }}-inji-certify-p12'
+    mountPath: /home/inji/CERTIFY_PKCS12
+
+  # ---- Spring property overrides (rendered to the -config ConfigMap) -------
+  appConfig:
+    domainUrl: '{{ tpl .Values.global.certifyDomainUrl $ }}'
+    # Built-in plugin: pushed /pre-authorized-data claims become the VC subject.
+    dataProviderPlugin: PreAuthDataProviderPlugin
+    cacheNames: "userinfo,vcissuance,certificatedatacache,credentialConfig,renderTemplate,jwks,preAuthCodeCache,asMetadataCache,credentialOfferCache"
+    # Free-form extra .properties lines appended verbatim (e.g. qr settings,
+    # status-list, signature algos). Keep env-specific tuning here.
+    extraProperties: ""
+
+  # ---- Environment ---------------------------------------------------------
+  # NOTE on config sourcing: the injistack image normally pulls base config
+  # from a Spring Cloud Config server. This chart layers the Phase-1 overrides
+  # via SPRING_CONFIG_ADDITIONAL_LOCATION. If your image has NO bundled
+  # defaults, also point it at your config-server (SPRING_CLOUD_CONFIG_URI) or
+  # extend the ConfigMap to carry the full property set. Validate per env.
+  envVars:
+    SPRING_CONFIG_NAME: certify
+    active_profile_env: default
+    SPRING_CONFIG_ADDITIONAL_LOCATION: 'file:/home/mosip/config/'
+    mosip_certify_domain_url: '{{ tpl .Values.global.certifyDomainUrl $ }}'
+    # Plugin loader path — stock image dirs (no custom jar needed for Phase 1).
+    loader_path_env: '/home/inji/additional_jars/,/home/mosip/additional_jars'
+
+  envVarsFrom:
+    SPRING_DATASOURCE_PASSWORD:
+      secretKeyRef:
+        name: '{{ tpl .Values.global.certifyDBSecret $ }}'
+        key: '{{ tpl .Values.global.certifyDBUserPasswordKey $ }}'
+
+  startupProbe:
+    enabled: true
+    httpGet:
+      path: /v1/certify/.well-known/jwks.json
+      port: http
+    initialDelaySeconds: 20
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 60
+    successThreshold: 1
+  livenessProbe:
+    enabled: true
+    httpGet:
+      path: /v1/certify/.well-known/jwks.json
+      port: http
+    initialDelaySeconds: 60
+    periodSeconds: 30
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+  readinessProbe:
+    enabled: true
+    httpGet:
+      path: /v1/certify/.well-known/jwks.json
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+
+  postgresCheckerInit:
+    enabled: true
+    image:
+      repository: postgres
+      tag: "15-alpine"
+      pullPolicy: IfNotPresent
+    command:
+    - 'sh'
+    args:
+    - '-c'
+    - 'until pg_isready -h "${DB_HOST}" -p "${DB_PORT}" -U "${DB_USER}" -d "${DB_NAME}"; do echo "Waiting for database ${DB_NAME}..."; sleep 3; done'
+    containerSecurityContext:
+      enabled: false
+
+  # postgres-checker env (separate from the main app env above)
+  envVarsChecker:
+    DB_HOST: '{{ .Values.global.postgresqlHost }}'
+    DB_PORT: '{{ .Values.global.certifyDBPort }}'
+    DB_NAME: '{{ tpl .Values.global.certifyDB $ }}'
+    DB_USER: '{{ tpl .Values.global.certifyDBUser $ }}'
+
+  containerPort: 8090
+
+# ---------------------------------------------------------------------------
+# Istio routing — one VirtualService, one route: /v1/certify → Certify service.
+# ---------------------------------------------------------------------------
+istio:
+  virtualservice:
+    enabled: true
+    host: '{{ tpl .Values.global.certifyHostname $ }}'
+    gateway: "internal"
