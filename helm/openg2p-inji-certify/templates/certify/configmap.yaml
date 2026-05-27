@@ -26,6 +26,9 @@ data:
     mosip.certify.integration.data-provider-plugin={{ .Values.appConfig.dataProviderPlugin }}
     mosip.certify.plugin-mode=DataProvider
 
+    # --- Issuer identity (env-level — one issuer/authority per environment) ---
+    mosip.certify.data-provider-plugin.did-url={{ tpl .Values.global.vcIssuerDid $ }}
+
     # credentialOfferCache is required by the pre-authorized-code / offer flow
     mosip.certify.cache.names={{ .Values.appConfig.cacheNames }}
 
