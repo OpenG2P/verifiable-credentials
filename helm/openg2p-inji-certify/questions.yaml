@@ -1,0 +1,129 @@
+questions:
+
+# ── General ─────────────────────────────────────────────────────────────────
+- variable: certify.enabled
+  description: Install the Inji Certify service
+  type: boolean
+  label: Inji Certify Service
+  default: true
+  group: General
+
+- variable: global.certifyHostname
+  description: Hostname under which Certify is accessed (e.g. certify.example.org)
+  type: string
+  label: Certify Hostname
+  group: General
+
+- variable: global.certifyDomainUrl
+  description: >-
+    Public base URL of Certify — used as the token issuer, JWKS, audiences and
+    proof aud. Defaults to https://<Certify Hostname>.
+  type: string
+  label: Certify Domain URL
+  group: General
+
+- variable: certify.image.tag
+  description: Inji Certify image tag
+  type: string
+  label: Certify Image Tag
+  default: "0.14.0"
+  group: General
+
+# ── Database ────────────────────────────────────────────────────────────────
+- variable: global.postgresqlHost
+  description: PostgreSQL server host (installed separately)
+  type: string
+  label: PostgreSQL Host
+  default: commons-postgresql
+  group: Database
+
+- variable: postgres-init.enabled
+  description: Run the postgres-init job to create Certify's DB and user
+  type: boolean
+  label: Run Postgres Init
+  default: true
+  group: Database
+
+- variable: dbSchemaInit.enabled
+  description: >-
+    Run the DB schema-init job (keymanager tables, key policies, credential_config).
+    Required on first install.
+  type: boolean
+  label: Run DB Schema Init
+  default: true
+  group: Database
+
+# ── Issuer (one authority per environment) ───────────────────────────────────
+- variable: certify.issuer.did
+  description: >-
+    Issuer DID — a resolvable did:web hosting the issuer's public key (the VC
+    `issuer`). Publish did.json at this URL using the key from
+    /v1/certify/.well-known/jwks.json.
+  type: string
+  label: Issuer DID
+  group: Issuer
+
+- variable: certify.issuer.keyAppId
+  description: Keymanager application id of the signing key
+  type: string
+  label: Signing Key App ID
+  default: CERTIFY_VC_SIGN_ED25519
+  group: Issuer
+
+- variable: certify.issuer.keyRefId
+  description: Keymanager reference id of the signing key
+  type: string
+  label: Signing Key Ref ID
+  default: ED25519_SIGN
+  group: Issuer
+
+- variable: certify.issuer.signatureAlgo
+  description: Signature algorithm (e.g. EdDSA)
+  type: string
+  label: Signature Algorithm
+  default: EdDSA
+  group: Issuer
+
+- variable: certify.issuer.signatureCryptoSuite
+  description: Signature crypto suite (e.g. Ed25519Signature2020)
+  type: string
+  label: Signature Crypto Suite
+  default: Ed25519Signature2020
+  group: Issuer
+
+# ── Credential definition ─────────────────────────────────────────────────────
+- variable: certify.credentialConfig.id
+  description: credential_configuration_id used by the issuance backend
+  type: string
+  label: Credential Config ID
+  default: OpenG2PBeneficiaryCredential
+  group: Credential
+
+- variable: certify.credentialConfig.credentialType
+  description: Comma-separated credential type (VC `type`)
+  type: string
+  label: Credential Type
+  default: OpenG2PBeneficiaryCredential,VerifiableCredential
+  group: Credential
+
+- variable: certify.credentialConfig.scope
+  description: OAuth scope for this credential
+  type: string
+  label: Credential Scope
+  default: openg2p_beneficiary_vc_ldp
+  group: Credential
+
+# ── Keystore (.p12) ───────────────────────────────────────────────────────────
+- variable: certify.p12.enabled
+  description: Mount a PKCS12 keystore (the issuer identity)
+  type: boolean
+  label: Mount .p12 Keystore
+  default: true
+  group: Keystore
+
+- variable: certify.p12.existingSecret
+  description: Name of the Secret holding the .p12 keystore
+  type: string
+  label: .p12 Secret Name
+  group: Keystore
+  show_if: "certify.p12.enabled=true"
