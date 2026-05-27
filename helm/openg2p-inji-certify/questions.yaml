@@ -53,65 +53,9 @@ questions:
   default: true
   group: Database
 
-# ── Issuer (one authority per environment) ───────────────────────────────────
-- variable: certify.issuer.did
-  description: >-
-    Issuer DID — a resolvable did:web hosting the issuer's public key (the VC
-    `issuer`). Publish did.json at this URL using the key from
-    /v1/certify/.well-known/jwks.json.
-  type: string
-  label: Issuer DID
-  group: Issuer
-
-- variable: certify.issuer.keyAppId
-  description: Keymanager application id of the signing key
-  type: string
-  label: Signing Key App ID
-  default: CERTIFY_VC_SIGN_ED25519
-  group: Issuer
-
-- variable: certify.issuer.keyRefId
-  description: Keymanager reference id of the signing key
-  type: string
-  label: Signing Key Ref ID
-  default: ED25519_SIGN
-  group: Issuer
-
-- variable: certify.issuer.signatureAlgo
-  description: Signature algorithm (e.g. EdDSA)
-  type: string
-  label: Signature Algorithm
-  default: EdDSA
-  group: Issuer
-
-- variable: certify.issuer.signatureCryptoSuite
-  description: Signature crypto suite (e.g. Ed25519Signature2020)
-  type: string
-  label: Signature Crypto Suite
-  default: Ed25519Signature2020
-  group: Issuer
-
-# ── Credential definition ─────────────────────────────────────────────────────
-- variable: certify.credentialConfig.id
-  description: credential_configuration_id used by the issuance backend
-  type: string
-  label: Credential Config ID
-  default: OpenG2PBeneficiaryCredential
-  group: Credential
-
-- variable: certify.credentialConfig.credentialType
-  description: Comma-separated credential type (VC `type`)
-  type: string
-  label: Credential Type
-  default: OpenG2PBeneficiaryCredential,VerifiableCredential
-  group: Credential
-
-- variable: certify.credentialConfig.scope
-  description: OAuth scope for this credential
-  type: string
-  label: Credential Scope
-  default: openg2p_beneficiary_vc_ldp
-  group: Credential
+# NOTE: Issuer DID/key and VC credential_config definitions are NOT set here —
+# they are owned by the consuming module (registry/NSR), which registers them
+# with Certify. This chart is the generic issuer service.
 
 # ── Keystore (.p12) ───────────────────────────────────────────────────────────
 - variable: certify.p12.enabled

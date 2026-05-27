@@ -37,11 +37,6 @@ postgres-init:
 # ---------------------------------------------------------------------------
 dbSchemaInit:
   enabled: true
-  # Seed an example credential_config from certify.issuer/credentialConfig below.
-  # PRODUCTION: keep false — the consuming MODULE (registry/NSR) owns and seeds
-  # its VC definitions, so Certify stays generic. Set true only for a
-  # standalone demo of this chart.
-  seedDemoCredential: false
   image:
     repository: postgres
     tag: "15-alpine"
@@ -99,29 +94,11 @@ certify:
     existingSecret: '{{ .Release.Name }}-inji-certify-p12'
     mountPath: /home/inji/CERTIFY_PKCS12
 
-  # ---- Issuer / authority (ONE issuer per environment) --------------------
-  # All static issuer config is set here and seeded into credential_config by
-  # the db-schema-init Job. Two one-time operational steps remain: keymanager
-  # generates the keypair on first boot, and you publish did.json at issuer.did
-  # (build it from GET /v1/certify/.well-known/jwks.json).
-  issuer:
-    # Resolvable did:web hosting the issuer public key (the VC `issuer`).
-    did: 'did:web:REPLACE-WITH-ISSUER-DID-HOST'
-    # Signing key in Certify's keymanager (auto-generated per key_policy_def).
-    keyAppId: CERTIFY_VC_SIGN_ED25519
-    keyRefId: ED25519_SIGN
-    signatureAlgo: EdDSA
-    signatureCryptoSuite: Ed25519Signature2020
-
-  # ---- The beneficiary credential seeded into credential_config -----------
-  credentialConfig:
-    id: OpenG2PBeneficiaryCredential
-    credentialType: 'OpenG2PBeneficiaryCredential,VerifiableCredential'
-    scope: openg2p_beneficiary_vc_ldp
-    # base64 of the Velocity VC template (inline JSON-LD context). Uses
-    # ${_issuer}, so it picks up issuer.did automatically. Subject = the
-    # 3 Phase-1 fields (functionalRecordId, fullName, dateOfBirth).
-    vcTemplateB64: 'ewogICJAY29udGV4dCI6IFsKICAgICJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSIsCiAgICB7CiAgICAgICJPcGVuRzJQQmVuZWZpY2lhcnlDcmVkZW50aWFsIjogImh0dHBzOi8vb3BlbmcycC5vcmcvbnMjT3BlbkcyUEJlbmVmaWNpYXJ5Q3JlZGVudGlhbCIsCiAgICAgICJmdW5jdGlvbmFsUmVjb3JkSWQiOiAiaHR0cHM6Ly9zY2hlbWEub3JnL2lkZW50aWZpZXIiLAogICAgICAiZnVsbE5hbWUiOiAiaHR0cHM6Ly9zY2hlbWEub3JnL25hbWUiLAogICAgICAiZGF0ZU9mQmlydGgiOiAiaHR0cHM6Ly9zY2hlbWEub3JnL2JpcnRoRGF0ZSIKICAgIH0sCiAgICAiaHR0cHM6Ly93M2lkLm9yZy9zZWN1cml0eS9zdWl0ZXMvZWQyNTUxOS0yMDIwL3YxIgogIF0sCiAgImlzc3VlciI6ICIke19pc3N1ZXJ9IiwKICAidHlwZSI6IFsKICAgICJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsCiAgICAiT3BlbkcyUEJlbmVmaWNpYXJ5Q3JlZGVudGlhbCIKICBdLAogICJpc3N1YW5jZURhdGUiOiAiJHt2YWxpZEZyb219IiwKICAiZXhwaXJhdGlvbkRhdGUiOiAiJHt2YWxpZFVudGlsfSIsCiAgImNyZWRlbnRpYWxTdWJqZWN0IjogewogICAgImlkIjogIiR7X2hvbGRlcklkfSIsCiAgICAiZnVuY3Rpb25hbFJlY29yZElkIjogIiR7ZnVuY3Rpb25hbFJlY29yZElkfSIsCiAgICAiZnVsbE5hbWUiOiAiJHtmdWxsTmFtZX0iLAogICAgImRhdGVPZkJpcnRoIjogIiR7ZGF0ZU9mQmlydGh9IgogIH0KfQ=='
+  # NOTE: This chart is GENERIC. The issuer DID + signing key and the VC
+  # `credential_config` definitions are NOT set here — the consuming MODULE
+  # (registry/NSR) owns them and registers them with Certify (see the registry
+  # chart's vcIssuance/vcDefinitions + credential-config-register Job). Certify
+  # only provides the schema, key policies, keystore and the OAuth/issuer URLs.
 
   # ---- Spring property overrides (rendered to the -config ConfigMap) -------
   appConfig:
