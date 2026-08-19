@@ -10,7 +10,7 @@ global:
   # key_policy_def). This DID is the issuer identity stamped onto credentials;
   # modules reference it (via the same env value) when registering their
   # credential_configs — they do NOT define the issuer.
-  vcIssuerDid: 'did:web:REPLACE-WITH-ISSUER-DID-HOST'
+  vcIssuerDid: 'did:web:certify.trial.openg2p.org'
 
   # Database (provisioned by the postgres-init subchart; server installed separately).
   postgresqlHost: commons-postgresql
@@ -99,8 +99,24 @@ certify:
   # generates/loads keys another way.
   p12:
     enabled: true
-    existingSecret: '{{ .Release.Name }}-inji-certify-p12'
     mountPath: /home/inji/CERTIFY_PKCS12
+    # Mode A (default — fresh install): generate the keystore on first boot onto a
+    # DURABLE PVC. local.p12 is the issuer master key; it MUST persist. An
+    # emptyDir would mint a new master key on every pod recreation, which would
+    # make the encrypted keymanager key rows in Postgres undecryptable and
+    # invalidate every previously issued credential. Back this PVC up TOGETHER
+    # with the keymanager key rows in Postgres (they are one identity).
+    persistence:
+      enabled: true
+      existingClaim: ""
+      storageClass: ""
+      accessModes:
+        - ReadWriteOnce
+      size: 64Mi
+    # Mode B (restore): mount a backed-up keystore from a Secret (read-only).
+    # When set, this takes precedence over persistence above and no PVC is used.
+    # The Secret must carry the keystore file under the key `local.p12`.
+    existingSecret: ""
 
   # NOTE on ownership:
   #  • Issuer (DID + signing key) = ENV-LEVEL, set HERE at Certify install
@@ -114,6 +130,15 @@ certify:
     domainUrl: '{{ tpl .Values.global.certifyDomainUrl $ }}'
     # Built-in plugin: pushed /pre-authorized-data claims become the VC subject.
     dataProviderPlugin: PreAuthDataProviderPlugin
+    # Package Spring @ComponentScans for the plugin beans. The bundled plugins
+    # (PreAuthDataProviderPlugin, MockVCIssuancePlugin, LoggerAuditService) live in
+    # this package inside the inji-certify-with-plugins image. REQUIRED — it is
+    # resolved during configuration parsing, so an unset value fails startup with
+    # "Could not resolve placeholder 'mosip.certify.integration.scan-base-package'".
+    scanBasePackage: io.mosip.certify.mock.integration
+    # Audit + VCI plugin beans selected by name (also in the package above).
+    auditPlugin: LoggerAuditService
+    vciPlugin: MockVCIssuancePlugin
     cacheNames: "userinfo,vcissuance,certificatedatacache,credentialConfig,renderTemplate,jwks,preAuthCodeCache,asMetadataCache,credentialOfferCache"
     # Free-form extra .properties lines appended verbatim (e.g. qr settings,
     # status-list, signature algos). Keep env-specific tuning here.

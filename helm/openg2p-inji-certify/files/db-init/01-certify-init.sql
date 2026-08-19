@@ -1,19 +1,21 @@
-CREATE DATABASE inji_certify
-  ENCODING = 'UTF8'
-  LC_COLLATE = 'en_US.UTF-8'
-  LC_CTYPE = 'en_US.UTF-8'
-  TABLESPACE = pg_default
-  OWNER = postgres
-  TEMPLATE  = template0;
-
-COMMENT ON DATABASE inji_certify IS 'certify related data is stored in this database';
-
-\c inji_certify postgres
+-- NOTE (OpenG2P chart): the upstream certify_init.sql ran as the `postgres`
+-- superuser and created the database itself (CREATE DATABASE ... OWNER=postgres,
+-- \c inji_certify postgres, ALTER SCHEMA ... OWNER TO postgres). In this chart
+-- the database + a least-privilege owner role are already provisioned by the
+-- `postgres-init` subchart, and this script is applied by the db-schema-init Job
+-- *as that owner role* — not as `postgres`. So we DROP the superuser-only,
+-- hardcoded-DB-name statements and instead operate on the connected database.
 
 DROP SCHEMA IF EXISTS certify CASCADE;
 CREATE SCHEMA certify;
-ALTER SCHEMA certify OWNER TO postgres;
-ALTER DATABASE inji_certify SET search_path TO certify,pg_catalog,public;
+-- Persist the search_path. postgres-init creates the database but the connecting
+-- role is NOT its owner (it only owns objects it creates), so ALTER DATABASE is
+-- not permitted. Instead set the default on the connecting role itself — an
+-- ordinary role is always allowed to change its OWN settings, and Certify connects
+-- as this same role, so its sessions inherit the certify schema on the path.
+ALTER ROLE CURRENT_USER SET search_path TO certify,pg_catalog,public;
+-- Also set it for the remainder of THIS session so the objects below land in certify.
+SET search_path TO certify,pg_catalog,public;
 
 --- keymanager specific DB changes ---
 CREATE TABLE certify.key_alias(

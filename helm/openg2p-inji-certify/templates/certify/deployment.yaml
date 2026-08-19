@@ -118,11 +118,13 @@ spec:
               mountPath: /home/mosip/config
               readOnly: true
             {{- if .Values.p12.enabled }}
-            # PKCS12 keystore (the issuer identity). Mounted from a Secret on
-            # durable storage — persist + back up (no HSM).
+            # PKCS12 keystore (the issuer identity; no HSM). Either generated on
+            # first boot onto a durable PVC, or restored read-only from a Secret.
             - name: certify-p12
               mountPath: {{ .Values.p12.mountPath }}
+              {{- if .Values.p12.existingSecret }}
               readOnly: true
+              {{- end }}
             {{- end }}
           {{- if .Values.extraVolumeMounts }}
             {{- include "common.tplvalues.render" (dict "value" .Values.extraVolumeMounts "context" $) | nindent 12 }}
@@ -136,8 +138,13 @@ spec:
             name: {{ include "common.names.fullname" . }}-config
         {{- if .Values.p12.enabled }}
         - name: certify-p12
+          {{- if .Values.p12.existingSecret }}
           secret:
             secretName: {{ tpl .Values.p12.existingSecret $ }}
+          {{- else }}
+          persistentVolumeClaim:
+            claimName: {{ tpl (.Values.p12.persistence.existingClaim | default (printf "%s-p12" (include "common.names.fullname" .))) $ }}
+          {{- end }}
         {{- end }}
       {{- if .Values.extraVolumes }}
         {{- include "common.tplvalues.render" (dict "value" .Values.extraVolumes "context" $) | nindent 8 }}

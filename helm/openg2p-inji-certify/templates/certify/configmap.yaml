@@ -8,11 +8,27 @@ metadata:
   name: {{ include "common.names.fullname" . }}-config
   labels: {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
 data:
-  # Spring property overrides layered on top of the image's bundled defaults.
-  # SPRING_CONFIG_NAME=certify + active_profile_env=default => Certify loads
-  # `certify-default.properties` from SPRING_CONFIG_LOCATION (/home/mosip/config).
-  # Mirrors the verified docker-compose Phase-1 config (push / pre-authorized-code).
+  # The injistack image pulls its base config from a Spring Cloud Config server.
+  # We don't run one, so this ConfigMap must carry the FULL property set, not just
+  # overrides — otherwise startup fails one-placeholder-at-a-time (e.g.
+  # 'mosip.certify.authn.filter-urls', 'scan-base-package', ...).
+  #
+  # Layout: the complete vendored `certify-default.properties` (files/config/
+  # certify-base.properties, identical to the verified docker-compose Phase-1
+  # config) is emitted first, then the OpenG2P-specific overrides are appended.
+  # In a single .properties file the LAST occurrence of a key wins, so the
+  # appended block deterministically overrides the base values above it.
+  # SPRING_CONFIG_NAME=certify + active_profile_env=default => Certify loads this
+  # `certify-default.properties` from SPRING_CONFIG_ADDITIONAL_LOCATION.
   certify-default.properties: |
+{{ .Files.Get "files/config/certify-base.properties" | indent 4 }}
+
+    # ====================================================================
+    # OpenG2P overrides (appended — last value wins over the base above)
+    # ====================================================================
+    # Don't waste startup trying to reach a (non-existent) config server.
+    spring.cloud.config.enabled=false
+
     # --- Certify as its own OAuth Authorization Server (pre-authorized-code, no eSignet) ---
     mosip.certify.domain.url={{ tpl .Values.appConfig.domainUrl $ }}
     mosip.certify.identifier={{ tpl .Values.appConfig.domainUrl $ }}
@@ -23,7 +39,12 @@ data:
     mosip.certify.oauth.issuer={{ tpl .Values.appConfig.domainUrl $ }}
 
     # --- Phase-1 PUSH: pushed claims become the credential subject (built-in plugin) ---
+    # scan-base-package is required (resolved at config-parse time); the others select
+    # the bundled plugin beans by name. All live in the scan-base-package below.
+    mosip.certify.integration.scan-base-package={{ .Values.appConfig.scanBasePackage }}
     mosip.certify.integration.data-provider-plugin={{ .Values.appConfig.dataProviderPlugin }}
+    mosip.certify.integration.audit-plugin={{ .Values.appConfig.auditPlugin }}
+    mosip.certify.integration.vci-plugin={{ .Values.appConfig.vciPlugin }}
     mosip.certify.plugin-mode=DataProvider
 
     # --- Issuer identity (env-level — one issuer/authority per environment) ---
@@ -33,7 +54,8 @@ data:
     mosip.certify.cache.names={{ .Values.appConfig.cacheNames }}
 
     # --- Certify's own datasource (keymanager tables, credential_config) ---
-    {{- $dbUrl := printf "jdbc:postgresql://%s:%v/%s" (tpl .Values.global.postgresqlHost $) .Values.global.certifyDBPort (tpl .Values.global.certifyDB $) }}
+    # currentSchema=certify so tables resolve even independent of the role search_path.
+    {{- $dbUrl := printf "jdbc:postgresql://%s:%v/%s?currentSchema=certify" (tpl .Values.global.postgresqlHost $) .Values.global.certifyDBPort (tpl .Values.global.certifyDB $) }}
     spring.datasource.url={{ $dbUrl }}
     spring.datasource.username={{ tpl .Values.global.certifyDBUser $ }}
     # spring.datasource.password is injected via the SPRING_DATASOURCE_PASSWORD env (from Secret)

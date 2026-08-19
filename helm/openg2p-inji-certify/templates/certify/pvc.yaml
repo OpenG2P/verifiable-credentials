@@ -1,0 +1,31 @@
+{{- if .Values.certify.enabled }}
+{{- $values := .Values.certify -}}
+{{- $context := dict "Values" (merge (deepCopy $values) (dict "global" .Values.global)) "Chart" .Chart "Release" .Release "Files" .Files "Capabilities" .Capabilities -}}
+{{- with $context -}}
+{{- if and .Values.p12.enabled (not .Values.p12.existingSecret) .Values.p12.persistence.enabled (not .Values.p12.persistence.existingClaim) }}
+# Durable storage for the generated PKCS12 keystore (issuer master key). This
+# PVC + the keymanager key rows in Postgres together ARE the issuer identity —
+# back them up as a unit. Retained across pod restarts/upgrades.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "common.names.fullname" . }}-p12
+  labels: {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+  annotations:
+    # Keep the keystore even if the release is uninstalled — deleting it loses
+    # the issuer identity. Remove this annotation only if you intend ephemeral.
+    "helm.sh/resource-policy": keep
+spec:
+  accessModes:
+    {{- range .Values.p12.persistence.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  {{- if .Values.p12.persistence.storageClass }}
+  storageClassName: {{ .Values.p12.persistence.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.p12.persistence.size | quote }}
+{{- end }}
+{{- end -}}
+{{- end }}
