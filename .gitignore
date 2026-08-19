@@ -5,3 +5,6 @@ vendor/
 # Java build output
 **/target/
 registry-dataprovider-plugin/dist/
+
+# Helm package outputs (CI/local `helm package` lands .tgz at repo root)
+/*.tgz

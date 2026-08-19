@@ -2,6 +2,12 @@ apiVersion: v2
 name: openg2p-inji-certify
 description: A Helm chart for MOSIP Inji Certify (OpenG2P VC issuer)
 type: application
+
+# STATIC placeholder — not the published version. The central pipeline
+# (openg2p/packaging@v1) derives one version per commit from git
+# (0.0.0-develop.<n> on develop, N.N.<next>-rc.<n> on a release line, N.N.N on a
+# release tag) and overrides it with `helm package --version`. Bumping this by
+# hand only affects a local `helm package` / `helm install .`.
 version: 0.0.0-develop
 dependencies:
 - name: common

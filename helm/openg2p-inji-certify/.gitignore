@@ -1,0 +1,5 @@
+# Resolved at package time by `helm dep up` (CI does this in the chart job), so
+# these are build output, not source. Every other OpenG2P chart ignores them too.
+Chart.lock
+*.tgz
+charts/*

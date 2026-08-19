@@ -1,0 +1,44 @@
+# verifiable-credentials — build & publish on GitLab.
+#
+# Hand-written, the `--ci` path of openg2p/packaging ci/migrate/github-to-gitlab.sh:
+# this repo was never on the central GitHub pipeline (it had no build/publish
+# caller), so the migrator had nothing to translate. All versioning/build/publish
+# logic lives centrally in openg2p/packaging@v1; this file only declares what THIS
+# repo has.
+#
+#   chart  -> openg2p/charts Helm registry                (shared catalogue)
+#
+# No images are built here, deliberately: the Certify runtime image is upstream
+# MOSIP (injistack/inji-certify), version-pinned in the chart's values.yaml, and
+# registry-dataprovider-plugin/Dockerfile is a JAR *builder* (FROM scratch AS
+# artifact, consumed via `docker build --output type=local`), not a runnable
+# service image. Add any real service image to IMAGES, and its chart values path
+# to CHART_IMAGE_PATHS.
+
+include:
+  - project: 'openg2p/packaging'
+    ref: v1                         # moving major tag; move it to roll out policy
+    file: '/ci/gitlab/build-publish.yml'
+
+variables:
+  PACKAGING_REF: v1                 # keep EQUAL to the include ref above
+
+  IMAGES: |
+    []
+
+  CHART_PATH: helm/openg2p-inji-certify
+  # Empty: every image this chart deploys is third-party and version-pinned
+  # (injistack/inji-certify, postgres), so none of them carries this repo's
+  # version. Stamping one would replace a valid upstream tag with a missing one.
+  CHART_IMAGE_PATHS: '[]'
+  # Shared catalogue -> all charts in ONE browsable Rancher repo.
+  CHART_GITLAB_PROJECT: openg2p/charts
+
+# ── Set these as GROUP CI/CD variables (masked) on the openg2p group ─────────
+#   HELM_PUBLISH_USER  / HELM_PUBLISH_TOKEN  -> group deploy token with
+#     write_package_registry (the job token can't write to the cross-project
+#     openg2p/charts registry). REQUIRED here — this repo publishes a chart.
+#   OPENROUTER_API_KEY -> AI changelog (optional; without it, human notes only).
+#
+# To skip AI or backfill a summary on a run, start a pipeline with variable
+# CHANGELOG_SKIP_AI=true or CHANGELOG_REGENERATE=<version>.
