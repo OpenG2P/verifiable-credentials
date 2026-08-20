@@ -43,12 +43,21 @@ data:
     # the bundled plugin beans by name. All live in the scan-base-package below.
     mosip.certify.integration.scan-base-package={{ .Values.appConfig.scanBasePackage }}
     mosip.certify.integration.data-provider-plugin={{ .Values.appConfig.dataProviderPlugin }}
-    mosip.certify.integration.audit-plugin={{ .Values.appConfig.auditPlugin }}
-    mosip.certify.integration.vci-plugin={{ .Values.appConfig.vciPlugin }}
+    {{- with .Values.appConfig.auditPlugin }}
+    mosip.certify.integration.audit-plugin={{ . }}
+    {{- end }}
+    {{- /* Omitted when empty: naming a plugin instantiates its bean, and a bean
+           whose own properties are unset fails startup. */}}
+    {{- with .Values.appConfig.vciPlugin }}
+    mosip.certify.integration.vci-plugin={{ . }}
+    {{- end }}
     mosip.certify.plugin-mode=DataProvider
 
     # --- Issuer identity (env-level — one issuer/authority per environment) ---
     mosip.certify.data-provider-plugin.did-url={{ tpl .Values.global.vcIssuerDid $ }}
+    {{- /* Issuer display metadata. Certify fails to start without it. Rendered as
+           the nested map literal Spring expects: { {'name':'X','locale':'en'} } */}}
+    mosip.certify.credential-config.issuer.display={ {{ range $i, $d := .Values.appConfig.issuerDisplay }}{{ if $i }}, {{ end }}{ 'name': '{{ $d.name }}', 'locale': '{{ default "en" $d.locale }}' }{{ end }} }
 
     # credentialOfferCache is required by the pre-authorized-code / offer flow
     mosip.certify.cache.names={{ .Values.appConfig.cacheNames }}

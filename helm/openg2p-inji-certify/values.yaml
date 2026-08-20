@@ -136,9 +136,29 @@ certify:
     # resolved during configuration parsing, so an unset value fails startup with
     # "Could not resolve placeholder 'mosip.certify.integration.scan-base-package'".
     scanBasePackage: io.mosip.certify.mock.integration
-    # Audit + VCI plugin beans selected by name (also in the package above).
+    # Audit plugin bean (also in the package above).
     auditPlugin: LoggerAuditService
-    vciPlugin: MockVCIssuancePlugin
+    # VC-issuance plugin. EMPTY ON PURPOSE.
+    #
+    # In plugin-mode=DataProvider (what we run) Certify fetches claims via the
+    # data-provider plugin and renders the credential from the Velocity template
+    # itself — a VCIssuancePlugin is only used in plugin-mode=VCIssuance, where
+    # the plugin returns the whole VC.
+    #
+    # Naming one here instantiates it: the upstream demo profile sets
+    # MockVCIssuancePlugin, whose bean then demands
+    # mosip.certify.mock.vciplugin.verification-method and fails startup without
+    # it. Loading a *mock* issuance plugin in a real deployment is undesirable
+    # anyway. Set this only if you switch to plugin-mode=VCIssuance with a real
+    # plugin, and supply that plugin's own properties via extraProperties.
+    vciPlugin: ""
+    # Human-readable name of the ISSUING AUTHORITY (the department or agency).
+    # Certify requires this — it is published in the issuer metadata and is what a
+    # wallet or verifier shows as "issued by". One entry per locale.
+    issuerDisplay:
+      - name: "OpenG2P"
+        locale: en
+
     cacheNames: "userinfo,vcissuance,certificatedatacache,credentialConfig,renderTemplate,jwks,preAuthCodeCache,asMetadataCache,credentialOfferCache"
     # Free-form extra .properties lines appended verbatim (e.g. qr settings,
     # status-list, signature algos). Keep env-specific tuning here.

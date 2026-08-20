@@ -24,8 +24,14 @@ spec:
     metadata:
       labels: {{- include "common.labels.standard" (dict "customLabels" .Values.podLabels "context" $) | nindent 8 }}
         app.kubernetes.io/component: certify
+      annotations:
+        # Roll the pods when the properties change. Without this a `helm upgrade`
+        # that only edits the ConfigMap leaves the running pods on the OLD
+        # config — they keep whatever they read at startup, so a config fix
+        # looks applied but changes nothing until someone restarts by hand.
+        checksum/config: {{ include (print $.Template.BasePath "/certify/configmap.yaml") $ | sha256sum }}
       {{- if .Values.podAnnotations }}
-      annotations: {{- include "common.tplvalues.render" (dict "value" .Values.podAnnotations "context" $) | nindent 8 }}
+        {{- include "common.tplvalues.render" (dict "value" .Values.podAnnotations "context" $) | nindent 8 }}
       {{- end }}
     spec:
       serviceAccountName: {{ include "certify.serviceAccountName" . }}
