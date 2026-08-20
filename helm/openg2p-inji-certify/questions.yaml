@@ -68,15 +68,27 @@ questions:
 
 # ── Keystore (.p12) ───────────────────────────────────────────────────────────
 - variable: certify.p12.enabled
-  description: Mount a PKCS12 keystore (the issuer identity)
+  description: >-
+    Keep the signing keystore (local.p12) on durable storage. LEAVE THIS ON.
+    The keystore is the issuer identity: together with the encrypted key rows in
+    PostgreSQL it is what every credential is signed with. Switched off, Certify
+    still generates a keystore but only inside the container, so a new one is
+    created on every restart — which makes the key rows in the database
+    undecryptable and every credential already issued unverifiable. There is no
+    recovery from that.
   type: boolean
-  label: Mount .p12 Keystore
+  label: Persist the signing keystore
   default: true
   group: Keystore
 
 - variable: certify.p12.existingSecret
-  description: Name of the Secret holding the .p12 keystore
+  description: >-
+    LEAVE BLANK for a new install — Certify then generates the keystore on first
+    boot and stores it on its own persistent volume. Only fill this in to RESTORE
+    a previously backed-up issuer identity: give the name of a Secret holding the
+    keystore under the key `local.p12`. When set, that Secret is mounted
+    read-only and no volume is created, so the restored identity is used as-is.
   type: string
-  label: .p12 Secret Name
+  label: Restore from existing .p12 Secret (optional)
   group: Keystore
   show_if: "certify.p12.enabled=true"
