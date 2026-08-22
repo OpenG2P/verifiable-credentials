@@ -72,7 +72,12 @@ certify:
   updateStrategy:
     type: RollingUpdate
   serviceAccount:
-    create: false
+    # Created by default so the keystore-backup sidecar's Secret-write
+    # permission lands on a ServiceAccount that is Certify's alone. With
+    # create=false the pod runs as the namespace `default` SA, and the
+    # RoleBinding would hand that permission to every other pod in the
+    # namespace that does not set its own.
+    create: true
     name: ""
   image:
     repository: injistack/inji-certify-with-plugins
@@ -129,8 +134,10 @@ certify:
       enabled: true
       secretName: '{{ include "common.names.fullname" . }}-p12-backup'
       fileName: local.p12
-      # A kubectl image; it only ever applies the one Secret named above.
-      image: bitnami/kubectl:1.31
+      # Needs kubectl only, to apply the one Secret named above.
+      # NOT a bitnami image: Bitnami withdrew its free Docker Hub images, so
+      # bitnami/kubectl no longer resolves and the sidecar ImagePullBackOffs.
+      image: alpine/k8s:1.31.0
       intervalSeconds: 60
       resources:
         requests:
