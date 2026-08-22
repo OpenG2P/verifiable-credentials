@@ -135,6 +135,65 @@ spec:
           {{- if .Values.extraVolumeMounts }}
             {{- include "common.tplvalues.render" (dict "value" .Values.extraVolumeMounts "context" $) | nindent 12 }}
           {{- end }}
+        {{- if and .Values.p12.enabled .Values.p12.backupToSecret.enabled (not .Values.p12.existingSecret) }}
+        {{- /*
+          Copies the generated keystore into a Secret so it lands in whatever
+          backs up this namespace.
+
+          A SIDECAR rather than a Job because the keystore lives on a
+          ReadWriteOnce PVC: a separate Job can be scheduled onto another node
+          and then cannot mount it at all. Sharing the pod removes that
+          question, and it also means the copy happens whenever the file
+          appears -- Certify generates it on FIRST BOOT, which is after any
+          post-install hook would have run.
+
+          The .p12 alone is not the whole identity: it holds the master key that
+          decrypts the keymanager key rows in Postgres. Restore both together or
+          neither is usable.
+        */}}
+        - name: p12-backup
+          image: {{ .Values.p12.backupToSecret.image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+          env:
+            - name: SRC
+              value: {{ printf "%s/%s" .Values.p12.mountPath .Values.p12.backupToSecret.fileName | quote }}
+            - name: SECRET_NAME
+              value: {{ tpl .Values.p12.backupToSecret.secretName . | quote }}
+            - name: INTERVAL
+              value: {{ .Values.p12.backupToSecret.intervalSeconds | quote }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -u
+              last=""
+              while true; do
+                if [ -f "$SRC" ]; then
+                  cur=$(md5sum "$SRC" | cut -d" " -f1)
+                  if [ "$cur" != "$last" ]; then
+                    # Re-applied only when the file actually changes, so this is
+                    # not a write loop against the API server.
+                    if kubectl create secret generic "$SECRET_NAME" \
+                         --from-file=local.p12="$SRC" \
+                         --dry-run=client -o yaml | kubectl apply -f - >/dev/null; then
+                      last="$cur"
+                      echo "p12-backup: keystore synced to secret/$SECRET_NAME"
+                    else
+                      echo "p12-backup: sync FAILED; will retry" >&2
+                    fi
+                  fi
+                fi
+                sleep "$INTERVAL"
+              done
+          volumeMounts:
+            - name: certify-p12
+              mountPath: {{ .Values.p12.mountPath }}
+              readOnly: true
+          resources: {{- toYaml .Values.p12.backupToSecret.resources | nindent 12 }}
+        {{- end }}
         {{- if .Values.sidecars }}
         {{- include "common.tplvalues.render" ( dict "value" .Values.sidecars "context" $) | nindent 8 }}
         {{- end }}

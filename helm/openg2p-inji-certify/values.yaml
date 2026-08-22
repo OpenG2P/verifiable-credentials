@@ -118,6 +118,27 @@ certify:
     # The Secret must carry the keystore file under the key `local.p12`.
     existingSecret: ""
 
+    # Mode A companion: copy the generated keystore into a Secret, so the issuer
+    # identity is included in whatever backs up this namespace rather than
+    # living only on a PVC that most backup tooling skips. Losing it makes every
+    # credential ever issued unverifiable, so this is ON by default.
+    #
+    # Not used in Mode B: restoring from existingSecret means a Secret already
+    # holds it, and re-copying would write over the source.
+    backupToSecret:
+      enabled: true
+      secretName: '{{ include "common.names.fullname" . }}-p12-backup'
+      fileName: local.p12
+      # A kubectl image; it only ever applies the one Secret named above.
+      image: bitnami/kubectl:1.31
+      intervalSeconds: 60
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          memory: 64Mi
+
   # NOTE on ownership:
   #  • Issuer (DID + signing key) = ENV-LEVEL, set HERE at Certify install
   #    (global.vcIssuerDid above; key alias via key_policy_def). One per env.
@@ -130,6 +151,16 @@ certify:
     domainUrl: '{{ tpl .Values.global.certifyDomainUrl $ }}'
     # Built-in plugin: pushed /pre-authorized-data claims become the VC subject.
     dataProviderPlugin: PreAuthDataProviderPlugin
+    # How long an issued credential stays valid, as an ISO-8601 duration.
+    # This is what fills ${validUntil} in the credential template; Certify's own
+    # default is P730D (two years) and was previously invisible here.
+    #
+    # NOTE: Certify applies this per DEPLOYMENT, not per credential type -- the
+    # property is read once by the data-provider plugin. A registry that needs a
+    # different validity per credential (say a 1-year farmer card and a 5-year
+    # identity card) cannot express that today; it needs per-credential_config
+    # support upstream in Certify.
+    vcExpiryDuration: P730D
     # Package Spring @ComponentScans for the plugin beans. The bundled plugins
     # (PreAuthDataProviderPlugin, MockVCIssuancePlugin, LoggerAuditService) live in
     # this package inside the inji-certify-with-plugins image. REQUIRED — it is
@@ -243,6 +274,9 @@ certify:
 # ---------------------------------------------------------------------------
 istio:
   virtualservice:
+    # Serve the DID document at /.well-known/did.json by rewriting to Certify's
+    # own /v1/certify/.well-known/did.json. Required for did:web to resolve.
+    exposeDidDocument: true
     enabled: true
     host: '{{ tpl .Values.global.certifyHostname $ }}'
     gateway: "internal"

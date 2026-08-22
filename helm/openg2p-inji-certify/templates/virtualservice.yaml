@@ -15,6 +15,35 @@ spec:
   gateways:
     - {{ $gateway }}
   http:
+    {{- if .Values.istio.virtualservice.exposeDidDocument }}
+    {{- /*
+      did:web resolution. `did:web:<host>` is defined to resolve to
+      https://<host>/.well-known/did.json, but Certify serves the document under
+      its servlet path at /v1/certify/.well-known/did.json. Without this rewrite
+      the issuer DID stamped into every credential does not resolve at all, and
+      a verifier cannot fetch the key to check the proof -- the credential still
+      LOOKS fine, it just cannot be verified by anyone.
+
+      Listed before the /v1/certify rule because Istio evaluates http routes in
+      order and takes the first match.
+    */}}
+    - name: certify-did-document
+      match:
+        - uri:
+            exact: /.well-known/did.json
+      rewrite:
+        uri: /v1/certify/.well-known/did.json
+      headers:
+        request:
+          set:
+            x-forwarded-host: {{ $host | quote }}
+            x-forwarded-proto: https
+      route:
+        - destination:
+            host: {{ $backendName }}
+            port:
+              number: {{ $backendPort }}
+    {{- end }}
     - name: certify
       match:
         - uri:

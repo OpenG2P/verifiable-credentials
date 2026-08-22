@@ -55,6 +55,7 @@ data:
 
     # --- Issuer identity (env-level — one issuer/authority per environment) ---
     mosip.certify.data-provider-plugin.did-url={{ tpl .Values.global.vcIssuerDid $ }}
+    mosip.certify.data-provider-plugin.vc-expiry-duration={{ .Values.appConfig.vcExpiryDuration }}
     {{- /* Issuer display metadata. Certify fails to start without it. Rendered as
            the nested map literal Spring expects: { {'name':'X','locale':'en'} } */}}
     mosip.certify.credential-config.issuer.display={ {{ range $i, $d := .Values.appConfig.issuerDisplay }}{{ if $i }}, {{ end }}{ 'name': '{{ $d.name }}', 'locale': '{{ default "en" $d.locale }}' }{{ end }} }
