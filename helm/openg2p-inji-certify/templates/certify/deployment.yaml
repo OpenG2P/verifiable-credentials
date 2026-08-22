@@ -64,6 +64,65 @@ spec:
       {{- end }}
       {{- if or .Values.postgresCheckerInit.enabled .Values.initContainers }}
       initContainers:
+        {{- if $.Values.dbSchemaInit.enabled }}
+        {{- /*
+          Creates the keymanager tables and credential_config schema before the
+          app container starts.
+
+          This is an INIT CONTAINER rather than a Job on purpose. As a
+          post-install hook it was skipped whenever the release failed for any
+          unrelated reason, leaving Certify to crash-loop on
+          `relation "key_alias" does not exist`; and under `helm --wait` it
+          deadlocked, because Helm waits for Certify to be ready before running
+          post-install hooks and Certify cannot be ready without these tables.
+          A plain Job would have fixed the first but is immutable on upgrade
+          once its template changes.
+
+          Running here ties schema creation to the thing that needs it, in the
+          right order, every start.
+        */}}
+        - name: certify-db-init
+          image: {{ $.Values.dbSchemaInit.image.repository }}:{{ $.Values.dbSchemaInit.image.tag }}
+          imagePullPolicy: {{ $.Values.dbSchemaInit.image.pullPolicy }}
+          env:
+            - name: PGHOST
+              value: {{ tpl $.Values.global.postgresqlHost $ | quote }}
+            - name: PGPORT
+              value: {{ $.Values.global.certifyDBPort | quote }}
+            - name: PGDATABASE
+              value: {{ tpl $.Values.global.certifyDB $ | quote }}
+            - name: PGUSER
+              value: {{ tpl $.Values.global.certifyDBUser $ | quote }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ tpl $.Values.global.certifyDBSecret $ | quote }}
+                  key: {{ tpl $.Values.global.certifyDBUserPasswordKey $ | quote }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -e
+              until pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" -d "$PGDATABASE"; do
+                echo "waiting for $PGDATABASE ..."; sleep 3;
+              done
+              # The vendored SQL is NOT idempotent -- `CREATE SCHEMA certify` and
+              # a dozen CREATE TABLEs carry no IF NOT EXISTS -- so it must only
+              # ever run once. key_alias is the table Certify fails on when the
+              # schema is absent, which makes it the right thing to test for.
+              if psql -tAc "select to_regclass('certify.key_alias')" | grep -q .; then
+                echo "Certify schema already present — nothing to do."
+                exit 0
+              fi
+              for f in $(ls /sql/*.sql | sort); do
+                echo "Applying $f";
+                psql -v ON_ERROR_STOP=1 -f "$f";
+              done
+              echo "Certify DB schema init complete."
+          volumeMounts:
+            - name: certify-db-init-sql
+              mountPath: /sql
+              readOnly: true
+        {{- end }}
         {{- if .Values.postgresCheckerInit.enabled }}
         - name: postgres-checker
           image: {{ include "common.images.image" (dict "imageRoot" .Values.postgresCheckerInit.image "global" .Values.global) }}
@@ -198,6 +257,11 @@ spec:
         {{- include "common.tplvalues.render" ( dict "value" .Values.sidecars "context" $) | nindent 8 }}
         {{- end }}
       volumes:
+        {{- if $.Values.dbSchemaInit.enabled }}
+        - name: certify-db-init-sql
+          configMap:
+            name: {{ $.Release.Name }}-certify-db-init-sql
+        {{- end }}
         - name: certify-config
           configMap:
             name: {{ include "common.names.fullname" . }}-config
