@@ -20,7 +20,7 @@
         <maven.compiler.release>21</maven.compiler.release>
         <!-- versions aligned to Inji Certify 0.14.0 (Spring Boot 3.2.3 / Spring 6.1.4) -->
         <certify.version>0.14.0</certify.version>
-        <spring.version>6.1.4</spring.version>
+        <spring.version>6.1.20</spring.version>
         <spring.boot.version>3.2.3</spring.boot.version>
     </properties>
 
