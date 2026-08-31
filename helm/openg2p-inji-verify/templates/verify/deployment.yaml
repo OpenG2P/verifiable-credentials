@@ -1,0 +1,70 @@
+{{- if .Values.verifyService.enabled }}
+{{- $v := .Values.verifyService -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "verify.fullname" . }}
+  labels: {{- include "verify.labels" . | nindent 4 }}
+spec:
+  replicas: {{ $v.replicaCount }}
+  selector:
+    matchLabels: {{- include "verify.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "verify.labels" . | nindent 8 }}
+        {{- with $v.podLabels }}{{- toYaml . | nindent 8 }}{{- end }}
+      {{- with $v.podAnnotations }}
+      annotations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "verify.serviceAccountName" . }}
+      {{- with $v.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $v.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $v.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: verify-service
+          image: "{{ $v.image.repository }}:{{ $v.image.tag }}"
+          imagePullPolicy: {{ $v.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ $v.service.targetPort }}
+              protocol: TCP
+          env: {{- include "verify.envVars" . | nindent 12 }}
+          {{- if $v.startupProbe.enabled }}
+          # Spring Boot on a cold JVM. A short budget here restarts the
+          # container mid-boot and presents as a crash loop rather than a slow
+          # start, so this is deliberately generous.
+          startupProbe:
+            httpGet:
+              path: {{ $v.contextPath }}{{ $v.startupProbe.path }}
+              port: http
+            initialDelaySeconds: {{ $v.startupProbe.initialDelaySeconds }}
+            periodSeconds: {{ $v.startupProbe.periodSeconds }}
+            failureThreshold: {{ $v.startupProbe.failureThreshold }}
+          {{- end }}
+          {{- if $v.livenessProbe.enabled }}
+          livenessProbe:
+            httpGet:
+              path: {{ $v.contextPath }}{{ $v.livenessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ $v.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ $v.livenessProbe.periodSeconds }}
+          {{- end }}
+          {{- if $v.readinessProbe.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ $v.contextPath }}{{ $v.readinessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ $v.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ $v.readinessProbe.periodSeconds }}
+          {{- end }}
+          {{- with $v.resources }}
+          resources: {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

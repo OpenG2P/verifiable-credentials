@@ -1,0 +1,29 @@
+apiVersion: v2
+name: openg2p-inji-verify
+description: A Helm chart for MOSIP Inji Verify service (OpenG2P VC verifier)
+type: application
+
+# STATIC placeholder — not the published version. The central pipeline
+# (openg2p/packaging@v1) derives one version per commit from git
+# (0.0.0-develop.<n> on develop, N.N.<next>-rc.<n> on a release line, N.N.N on a
+# release tag) and overrides it with `helm package --version`. Bumping this by
+# hand only affects a local `helm package` / `helm install .`.
+version: 0.0.0-develop
+dependencies:
+- name: common
+  repository: https://openg2p.github.io/openg2p-helm
+  version: 2.30.0
+# NOTE: deliberately no postgres-init dependency. See values.yaml — this chart
+# runs verify-service stateless, on its bundled in-memory database.
+icon: https://openg2p.github.io/openg2p-helm/openg2p-logo.png
+keywords:
+  - openg2p
+  - inji
+  - verify
+  - verifiable-credentials
+maintainers:
+  - email: info@openg2p.org
+    name: OpenG2P
+annotations:
+  catalog.cattle.io/display-name: "OpenG2P Inji Verify"
+  openg2p.org/add-to-rancher: ""

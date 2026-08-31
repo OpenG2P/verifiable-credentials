@@ -1,0 +1,25 @@
+{{- if and .Values.verifyService.enabled .Values.global.istio.enabled }}
+{{- $host := include "common.tplvalues.render" (dict "value" .Values.verifyService.hostname "context" .) }}
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: {{ include "verify.fullname" . }}
+  labels: {{- include "verify.labels" . | nindent 4 }}
+spec:
+  hosts:
+    - {{ $host | quote }}
+  gateways:
+    - {{ default (printf "%s-gateway" (include "verify.fullname" .)) .Values.global.istio.gateway.name | quote }}
+  http:
+    # verify-service serves everything under its own context path, set in the
+    # image's bootstrap.properties and not configurable. Route the prefix
+    # through unrewritten so /v1/verify/vc-verification lands where it expects.
+    - match:
+        - uri:
+            prefix: {{ .Values.verifyService.contextPath | quote }}
+      route:
+        - destination:
+            host: {{ include "verify.fullname" . }}
+            port:
+              number: {{ .Values.verifyService.service.port }}
+{{- end }}

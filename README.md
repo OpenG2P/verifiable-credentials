@@ -15,6 +15,7 @@ Phase 2 (device wallet / OpenID4VCI pull) is designed but not the current delive
 | Path | What it is |
 | --- | --- |
 | `helm/openg2p-inji-certify` | Helm chart deploying **Inji Certify** OpenG2P-style (`common` + `postgres-init` deps, properties ConfigMap, `.p12` keystore volume, DB-schema-init Job). Generic — it seeds **no** `credential_config`; consuming modules register their own. |
+| `helm/openg2p-inji-verify` | Helm chart deploying **Inji Verify's `verify-service`** — the verifier side. Stock image, **no MOSIP config-server, no PostgreSQL** (bundled in-memory DB) and **no `verify-ui`**. A **separate** chart from Certify on purpose: issuer and verifier sit on opposite sides of a trust boundary. See the [Verification](https://docs.openg2p.org/platform/platform-services/vc-issuance/verification) guide. |
 | `registry-dataprovider-plugin` | Java `DataProvider` plugin that reads a registry view directly (the **Phase-2 / pull** model). Built to a JAR via `build.sh` or the Dockerfile's `artifact` target. |
 | `scripts/issue_vc.py` | Helper to drive an end-to-end issuance against a running Certify. |
 | `scripts/uninstall-inji-certify.sh` | Full teardown of a Certify install — release, DB + role inside `commons-postgresql`, keystore PVC, pinned Secrets. |

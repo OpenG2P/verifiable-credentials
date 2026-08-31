@@ -1,0 +1,123 @@
+# ===========================================================================
+# OpenG2P — Inji Verify (verifier side)
+#
+# Runs MOSIP's stock `inji-verify-service` and NOTHING ELSE. In particular it
+# does not install:
+#
+#   * the MOSIP config-server — verify-service reads plain Spring properties,
+#     so every setting below is an ordinary environment variable;
+#   * PostgreSQL — see `stateless` below;
+#   * `inji-verify-ui` — the OpenG2P Agent Portal provides its own upload-and-
+#     check screen against this service's API, so the stock React portal is not
+#     deployed. Nothing stops a deployment adding it; it is simply not ours.
+#
+# Deliberately a SEPARATE chart from openg2p-inji-certify. The two sit on
+# opposite sides of a trust boundary: Certify is run by the ISSUING authority,
+# Verify by a RELYING PARTY — potentially a different organisation, in a
+# different cluster. Packaging them together would encode the claim that they
+# deploy as a pair, which is exactly the wrong mental model. Install both
+# together via commons-services if an environment wants both.
+# ===========================================================================
+
+global:
+  verifyHostname: 'verify.trial.openg2p.org'
+
+  istio:
+    enabled: true
+    gateway:
+      name: ''
+      httpsEnabled: false
+      tls:
+        mode: SIMPLE
+        credentialName: ""
+
+# ---------------------------------------------------------------------------
+# verify-service
+# ---------------------------------------------------------------------------
+verifyService:
+  enabled: true
+  nameOverride: inji-verify-service
+  replicaCount: 1
+  hostname: '{{ tpl .Values.global.verifyHostname $ }}'
+
+  image:
+    repository: injistack/inji-verify-service
+    tag: "0.18.2"
+    pullPolicy: IfNotPresent
+
+  # The image serves everything under this prefix (set in bootstrap.properties);
+  # it is not configurable, so routing and probes must both use it.
+  contextPath: /v1/verify
+
+  # ── Stateless mode ───────────────────────────────────────────────────────
+  # verify-service ships two Spring profiles. `default` expects an external
+  # PostgreSQL (DATABASE_* env); `local` uses a bundled in-memory HSQLDB whose
+  # schema it creates at boot.
+  #
+  # We use `local`, because the database exists for OpenID4VP presentation
+  # transactions (vp-request / vp-result / session state) and we use none of
+  # them: the Agent Portal posts a QR payload to /vc-verification, which is a
+  # single stateless call in and a verdict out. An external database for that
+  # would be an operational cost with nothing stored in it.
+  #
+  # The consequence, stated plainly: any OpenID4VP flow would NOT survive a
+  # restart here. Turn this off and supply `database` below before enabling
+  # those flows.
+  stateless: true
+
+  # Only read when `stateless: false`. Kept so switching is a values change
+  # rather than a chart change.
+  database:
+    host: commons-postgresql
+    port: 5432
+    name: inji_verify
+    schema: verify
+    username: ''
+    existingSecret: ''
+    existingSecretPasswordKey: ''
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+
+  # Actuator is on the classpath (spring-boot-starter-actuator).
+  startupProbe:
+    enabled: true
+    path: /actuator/health
+    initialDelaySeconds: 20
+    periodSeconds: 10
+    # Spring Boot on a cold JVM; generous, because a failed startup probe
+    # restarts the container and makes the problem look like a crash loop.
+    failureThreshold: 30
+  livenessProbe:
+    enabled: true
+    path: /actuator/health
+    initialDelaySeconds: 60
+    periodSeconds: 20
+  readinessProbe:
+    enabled: true
+    path: /actuator/health
+    initialDelaySeconds: 20
+    periodSeconds: 10
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 1Gi
+    limits:
+      memory: 2Gi
+
+  serviceAccount:
+    create: true
+    name: ''
+
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  # Passed through verbatim. Anything here overrides the computed values above,
+  # so an operator can set a property the chart does not model.
+  extraEnvVars: {}
