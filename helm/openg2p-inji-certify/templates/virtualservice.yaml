@@ -24,6 +24,15 @@ spec:
       a verifier cannot fetch the key to check the proof -- the credential still
       LOOKS fine, it just cannot be verified by anyone.
 
+      The SAME applies to the JWKS, for the QR rather than the credential. The
+      printed QR is a claim-169 CWT whose `iss` is the plain issuer URL, not a
+      DID, and whose COSE `kid` names the ES256 key -- so a verifier resolves
+      https://<host>/.well-known/jwks.json. Certify serves that only under its
+      servlet path too, and the ES256 key appears ONLY there: the DID document
+      is built from credential_config.signature_algo, which is the credential's
+      EdDSA, never the QR's ES256. Without this rewrite the one signature anyone
+      checks on paper cannot be verified at all.
+
       Listed before the /v1/certify rule because Istio evaluates http routes in
       order and takes the first match.
     */}}
@@ -33,6 +42,22 @@ spec:
             exact: /.well-known/did.json
       rewrite:
         uri: /v1/certify/.well-known/did.json
+      headers:
+        request:
+          set:
+            x-forwarded-host: {{ $host | quote }}
+            x-forwarded-proto: https
+      route:
+        - destination:
+            host: {{ $backendName }}
+            port:
+              number: {{ $backendPort }}
+    - name: certify-jwks
+      match:
+        - uri:
+            exact: /.well-known/jwks.json
+      rewrite:
+        uri: /v1/certify/.well-known/jwks.json
       headers:
         request:
           set:
