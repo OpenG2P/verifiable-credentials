@@ -20,7 +20,9 @@
 # ===========================================================================
 
 global:
-  verifyHostname: 'verify.trial.openg2p.org'
+  # Derived from baseDomain like every other public host.
+  baseDomain: openg2p.org
+  verifyHostname: 'verify.{{ tpl .Values.global.baseDomain $ }}'
 
   istio:
     enabled: true

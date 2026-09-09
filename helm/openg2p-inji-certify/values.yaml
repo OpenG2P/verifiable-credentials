@@ -1,5 +1,9 @@
 global:
-  certifyHostname: 'certify.trial.openg2p.org'
+  # Everything public is derived from this. Override it once at install and every
+  # hostname, issuer DID and audience below follows; nothing hardcodes a domain
+  # or an environment.
+  baseDomain: openg2p.org
+  certifyHostname: 'certify.{{ tpl .Values.global.baseDomain $ }}'
   # Public base URL of this Certify (used as token issuer / JWKS / audiences).
   # Must match the host clients use, so the proof `aud` resolves correctly.
   certifyDomainUrl: 'https://{{ tpl .Values.global.certifyHostname $ }}'
@@ -10,7 +14,7 @@ global:
   # key_policy_def). This DID is the issuer identity stamped onto credentials;
   # modules reference it (via the same env value) when registering their
   # credential_configs — they do NOT define the issuer.
-  vcIssuerDid: 'did:web:certify.trial.openg2p.org'
+  vcIssuerDid: 'did:web:{{ tpl .Values.global.certifyHostname $ }}'
 
   # Database (provisioned by the postgres-init subchart; server installed separately).
   postgresqlHost: commons-postgresql
